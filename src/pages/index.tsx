@@ -6,46 +6,48 @@ import { HomeContainer, Product } from "@/styles/pages/home";
 
 import 'keen-slider/keen-slider.min.css'
 import { stripe } from "@/lib/stripe";
-import { GetServerSideProps } from "next";
+import { GetStaticProps } from "next";
 import Stripe from "stripe";
+import Link from "next/link";
 
 interface HomeProps {
   products: {
     id: string,
     name: string,
     imageUrl: string,
-    price: number
+    price: string
   }[]
 }
 
 export default function Home({ products }: HomeProps) {
   const [sliderRef] = useKeenSlider({
     slides: {
-      perView: 2,
+      perView: 2.5,
       spacing: 48,
     }
   })
 
-  console.log(products)
   return (
     <HomeContainer ref={sliderRef} className="keen-slider">
       {products.map(product => {
         return (
-          <Product key={product.id} className="keen-slider__slide">
-            <Image priority={true} src={product.imageUrl} width={520} height={520} alt=""/>
+          <Link href={`/product/${product.id}`} key={product.id} legacyBehavior>
+            <Product className="keen-slider__slide">
+              <Image priority={true} src={product.imageUrl} width={520} height={520} alt=""/>
 
-            <footer>
-              <strong>{product.name}</strong>
-              <span>R$ {product.price}</span>
-            </footer>
-          </Product>
+              <footer>
+                <strong>{product.name}</strong>
+                <span>{product.price}</span>
+              </footer>
+            </Product>
+          </Link>
         )
       })}
     </HomeContainer>
   );
 }
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getStaticProps: GetStaticProps = async () => {
   const response = await stripe.products.list({
     expand: ['data.default_price']
   })
@@ -57,13 +59,17 @@ export const getServerSideProps: GetServerSideProps = async () => {
       id: product.id,
       name: product.name,
       imageUrl: product.images[0],
-      price: price.unit_amount ? price.unit_amount / 100 : 0,
+      price: price.unit_amount ? 
+        new Intl.NumberFormat('pt-br', { style: 'currency', currency: 'BRL' }).format(price.unit_amount / 100) 
+        : 
+        "0",
     }
   }) 
 
   return {
     props: {
       products
-    }
+    },
+    revalidate: 60 * 60 * 2, // 2 hours
   }
 }
