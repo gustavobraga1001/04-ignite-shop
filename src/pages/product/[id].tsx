@@ -1,8 +1,11 @@
 import { stripe } from "@/lib/stripe";
 import { ImageContainer, ProductContainer, ProductDetails } from "@/styles/pages/product";
+import axios from "axios";
 import { GetStaticPaths, GetStaticProps } from "next";
+import Head from "next/head";
 import Image from "next/image";
 import { useRouter } from "next/router";
+import { useState } from "react";
 import Stripe from "stripe";
 
 interface ProductProps {
@@ -11,11 +14,13 @@ interface ProductProps {
     name: string,
     imageUrl: string,
     price: string,
-    description: string
+    description: string,
+    defaultPriceId: string,
   }
 }
 
 export default function Product({ product }: ProductProps) {
+  const [isCreatingCheckoutSession, setIsCreatingCheckoutSession] = useState(false)
 
   const { isFallback } = useRouter()
 
@@ -23,21 +28,43 @@ export default function Product({ product }: ProductProps) {
     return <p>Loading</p>
   }
 
-  return (
-    <ProductContainer>
-      <ImageContainer>
-        <Image src={product.imageUrl} width={520} height={480} alt=""/>
-      </ImageContainer>
+  async function handleBuyProduct() {
+    try {
+      setIsCreatingCheckoutSession(true)
+      const response = await axios.post('/api/checkout', {
+        priceId: product.defaultPriceId,
+      })
 
-      <ProductDetails>
-        <h1>{product.name}</h1>
-        <span>{product.price}</span>
+      const { checkoutUrl } = response.data
 
-        <p>{product.description}</p>
+      window.location.href = checkoutUrl
       
-        <button>Compra Agora</button>
-      </ProductDetails>
-    </ProductContainer>
+    } catch (error) {
+      setIsCreatingCheckoutSession(false)
+      alert('Falha')
+    }
+  }
+
+  return (
+    <>
+      <Head>
+        <title>{product.name}</title>
+      </Head>
+      <ProductContainer>
+        <ImageContainer>
+          <Image src={product.imageUrl} width={520} height={480} alt=""/>
+        </ImageContainer>
+
+        <ProductDetails>
+          <h1>{product.name}</h1>
+          <span>{product.price}</span>
+
+          <p>{product.description}</p>
+        
+          <button disabled={isCreatingCheckoutSession} onClick={handleBuyProduct}>Compra Agora</button>
+        </ProductDetails>
+      </ProductContainer>
+    </>
   );
 }
 
@@ -70,6 +97,7 @@ export const getStaticProps: GetStaticProps<any, { id: string }> = async ({ para
           : 
           "0",
         description: product.description,
+        defaultPriceId: price.id
       }
     },
     revalidate: 60 * 60 * 1 // 1 hour
